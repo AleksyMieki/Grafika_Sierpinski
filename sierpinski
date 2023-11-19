@@ -1,0 +1,149 @@
+import pygame
+from pygame.locals import *
+from PIL import Image
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import random
+
+def draw_floor():
+    glBegin(GL_QUADS) 
+    glColor3f(0.5, 0.5, 0.5)
+    glVertex3f(-5, -1, 5)
+    glVertex3f(5, -1, 5)
+    glVertex3f(5, -1, -5)
+    glVertex3f(-5, -1, -5)
+    glEnd()
+
+
+def load_texture():
+    textureSurface = Image.open("multi.jpg")  
+    textureData = textureSurface.tobytes()
+    width = textureSurface.size[0]
+    height = textureSurface.size[1]
+
+    texture = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, texture)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData)
+    
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    
+    glEnable(GL_TEXTURE_2D)
+    return texture
+
+def light(light_pos):
+
+    glLightfv(GL_LIGHT0, GL_POSITION, [1, 1, 1, 0])  
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, [1, 1, 1, 1])   
+
+
+    glLightfv(GL_LIGHT1, GL_POSITION, light_pos) 
+
+
+def change_light_color():
+    color = [random.random() for _ in range(3)] + [1.0]
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, color)
+
+
+def sierpinski(points, level):
+    if level == 0:
+        glBegin(GL_TRIANGLES)
+        for point in points:
+            glVertex3fv(point)
+        glEnd()
+    else:
+        midpoints = [
+            [(points[0][i] + points[1][i]) / 2 for i in range(3)],
+            [(points[1][i] + points[2][i]) / 2 for i in range(3)],
+            [(points[2][i] + points[0][i]) / 2 for i in range(3)]
+        ]
+        sierpinski([points[0], midpoints[0], midpoints[2]], level - 1)
+        sierpinski([points[1], midpoints[0], midpoints[1]], level - 1)
+        sierpinski([points[2], midpoints[1], midpoints[2]], level - 1)
+
+
+def main():
+
+    pygame.init()
+    display = (800, 600)
+    pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
+    val = input("Podaj poziom: ")
+    levels = int(val)
+    fov = 45
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, [0.5, 0.5, 0.5, 1]) 
+
+    gluPerspective(fov, (display[0]/display[1]), 0.1, 50.0)
+    glTranslatef(0.0, 0.0, -5)
+
+    texture_enabled = False
+    texture = load_texture()
+
+    light_pos = [0, 1, 0, 3] 
+
+    glEnable(GL_LIGHTING)
+    glEnable(GL_LIGHT1)
+    glEnable(GL_LIGHT0)
+    glEnable(GL_COLOR_MATERIAL)
+    glEnable(GL_DEPTH_TEST)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    glMatrixMode(GL_PROJECTION)
+                    glTranslatef(0.1, 0, 0)
+                    glMatrixMode(GL_MODELVIEW)
+                if event.key == pygame.K_RIGHT:
+                    glMatrixMode(GL_PROJECTION)
+                    glTranslatef(-0.1, 0, 0)
+                    glMatrixMode(GL_MODELVIEW)
+                if event.key == pygame.K_UP:
+                    glMatrixMode(GL_PROJECTION)
+                    glTranslatef(0, 0.1, 0)
+                    glMatrixMode(GL_MODELVIEW)
+                if event.key == pygame.K_DOWN:
+                    glMatrixMode(GL_PROJECTION)
+                    glTranslatef(0, -0.1, 0)
+                    glMatrixMode(GL_MODELVIEW)
+                if event.key == pygame.K_q:
+                    texture_enabled = not texture_enabled
+                
+                if event.key == pygame.K_r:
+                    change_light_color() 
+
+        
+        if texture_enabled:
+                glEnable(GL_TEXTURE_2D)
+                glBindTexture(GL_TEXTURE_2D, texture)
+        else:
+                glDisable(GL_TEXTURE_2D)    
+
+        glRotatef(0.5, 0, 0.5, 0)
+
+        vertices = [
+            [0, 1, 0],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, -1, -1],
+            [1, -1, -1]
+        ]
+
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+        light(light_pos)
+        sierpinski([vertices[0], vertices[1], vertices[2]], levels)
+        sierpinski([vertices[0], vertices[1], vertices[3]], levels)
+        sierpinski([vertices[0], vertices[2], vertices[4]], levels)
+        sierpinski([vertices[0], vertices[3], vertices[4]], levels)
+        
+        draw_floor()
+        pygame.display.flip()
+        pygame.time.wait(10)
+
+if __name__ == "__main__":
+    main()
